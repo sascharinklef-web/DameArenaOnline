@@ -13,3 +13,11 @@ Keine automatische Übertragung ohne separate Opt-in-Bestätigung. Vorhandene un
 
 BETRIEBSGRENZEN
 Dies ist ein erster Ingest-Prototyp, kein gehärteter öffentlicher Datendienst. Vor breiter Freigabe: Abuse-Schutz/Rate-Limit, Datenlöschprozess, Aufbewahrungsfrist, Datenschutzhinweise, Zugriffskontrolle und Monitoring ergänzen. Keine Behauptung, dass die Übertragung bereits live funktioniert, bevor Netlify erfolgreich deployed und getestet wurde. iOS-PWA synchronisiert nur bei geöffneter App/erneutem Online-Status; kein verlässlicher Hintergrund-Sync. Persönliche Sicherung bleibt erforderlich.
+
+
+HOTFIX 1.5.1
+- Zugruecknahme: KI wird nach einem zurueckgenommenen Menschenzug erneut gestartet.
+- Zugfolge wird ohne Nebenwirkungen rekonstruiert; bei Fehler bleibt Original erhalten.
+- HTTP 404 ist ein Deployment-Problem: Netlify Function community-ingest muss im aktiven Site-Deploy vorhanden sein.
+- Im Netlify-Dashboard unter Functions kontrollieren. Bei fehlender Function GitHub-basiertes Deployment mit npm install und netlify.toml im Repository-Root pruefen.
+- Nicht nur index.html/app.js hochladen: auch netlify/functions/community-ingest.mjs, package.json und netlify.toml deployen.
