@@ -1,5 +1,5 @@
 'use strict';
-// DameArena Mobile 1.2. Rules ported from dame_engine.py 116.5.1.
+// DameArena Mobile 1.5. Rules ported from dame_engine.py 116.5.1.
 const KEY='damearena.mobile.v1', $=id=>document.getElementById(id), uid=()=>crypto.randomUUID();
 const clone=x=>JSON.parse(JSON.stringify(x));
 const fresh=()=>Array.from({length:8},(_,r)=>Array.from({length:8},(_,c)=>(r+c)%2?(r<3?'s':r>4?'w':'.'):'.'));
@@ -15,7 +15,7 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){$('s
 function start(){lastAiStep=null;const id=uid();data.current={game_id:id,player_id:data.profile.player_id,white_player_id:data.profile.player_id,black_player_id:'damearena-mobile-ai-v1',ai_version:'mobile-1.0-minimax',difficulty:Number($('level').value),platform:'ios-web-pwa',schema_version:2,started_at:new Date().toISOString(),result:null,steps:[],state:{board:fresh(),side:'w',chain:null},positions:{},quiet:0};data.current.positions[poskey(data.current.state)]=1;selected=null;save();render();}
 function coord(a){return 'abcdefgh'[a[1]]+(8-a[0]);}
 function record(m){const g=data.current,prev=g.state;g.state=apply(prev,m);g.steps.push({ply:g.steps.length+1,actor_type:prev.side==='w'?'HUMAN':'AI',actor_id:prev.side==='w'?g.white_player_id:g.black_player_id,side:prev.side,from:coord(m.from),to:coord(m.to),capture:!!m.capture,captured_square:m.capture?coord(m.capture):null,at:new Date().toISOString()});if(!g.state.chain){const key=poskey(g.state);g.positions[key]=(g.positions[key]||0)+1;g.quiet=m.capture?0:g.quiet+1;const moves=options(g.state.board,g.state.side,g.state.chain);if(!moves.length)finish(prev.side==='w'?'white':'black');else if(g.positions[key]>=3||g.quiet>=100)finish('draw');}save();}
-function finish(result){const g=data.current;if(g.result)return;g.result=result;g.ended_at=new Date().toISOString();data.games.push(clone({...g,state:undefined,positions:undefined}));save();}
+function finish(result){const g=data.current;if(g.result)return;g.result=result;g.ended_at=new Date().toISOString();data.games.push(clone({...g,state:undefined,positions:undefined}));save();scheduleCommunitySync();}
 let lastAiStep=null;
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function aiTurn(){
@@ -62,6 +62,46 @@ async function saveToFiles(payload,prefix){
 }
 $('export').onclick=()=>saveToFiles(personalBackup(),'DameArena_Partien_'+(data.profile?.display_name||'Spieler').replace(/[^a-zA-Z0-9_-]/g,'_'));
 $('communityExport').onclick=()=>{if(!$('consent').checked){alert('Bitte bestätige zuerst die freiwillige Freigabe.');return;}const games=data.games.map(communityGame);saveToFiles({schema:'damearena-community-v2',exported_at:new Date().toISOString(),privacy:'no-display-name-or-player-uuid',consent:true,source:'mobile-1.3',games},'DameArena_Community');};
+// Community Sync: opt-in only. Acknowledgements are stored locally by game ID.
+const SYNC_KEY='damearena.community.sync.v1';
+let syncSettings={enabled:false,sent:[],lastSuccess:null};
+try{const stored=JSON.parse(localStorage.getItem(SYNC_KEY));if(stored&&typeof stored==='object')syncSettings={...syncSettings,...stored,enabled:stored.enabled===true,sent:Array.isArray(stored.sent)?stored.sent:[]};}catch{}
+function saveSyncSettings(){try{localStorage.setItem(SYNC_KEY,JSON.stringify(syncSettings));}catch(e){console.warn('Sync-Einstellungen nicht gespeichert',e);}}
+function syncStatus(message){const el=$('syncStatus');if(el)el.textContent=message;}
+let syncRunning=false;
+async function communitySync(){
+ if(!syncSettings.enabled||syncRunning||!navigator.onLine)return;
+ syncRunning=true;
+ try{
+  const sent=new Set(syncSettings.sent);
+  const pending=data.games.filter(g=>g&&g.result&&typeof g.game_id==='string'&&!sent.has(g.game_id));
+  if(!pending.length){syncStatus('Alle abgeschlossenen Partien synchronisiert.');return;}
+  syncStatus(pending.length+' Partie(n) zur Übertragung vorgemerkt …');
+  for(const g of pending){
+   if(!syncSettings.enabled)break;
+   const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),12000);
+   let response;
+   try{response=await fetch('/.netlify/functions/community-ingest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema:'damearena-community-v2',consent:true,game:communityGame(g)}),signal:controller.signal,cache:'no-store'});}finally{clearTimeout(timeout);}
+   if(!response.ok)throw Error('Serverantwort '+response.status);
+   const ack=await response.json();if(!ack.ok||ack.game_id!==g.game_id)throw Error('Ungültige Serverbestätigung');
+   syncSettings.sent.push(g.game_id);syncSettings.lastSuccess=new Date().toISOString();saveSyncSettings();
+  }
+  syncStatus('Community Sync erfolgreich · '+syncSettings.sent.length+' Partien bestätigt.');
+ }catch(err){syncStatus('Übertragung ausstehend ('+err.message+'). Erneuter Versuch bei nächstem App-Start/Online-Wechsel.');}
+ finally{syncRunning=false;}
+}
+function scheduleCommunitySync(){if(syncSettings.enabled)setTimeout(communitySync,100);}
+$('autoSync').checked=syncSettings.enabled;
+$('autoSync').onchange=()=>{
+ const enable=$('autoSync').checked;
+ if(enable&&!confirm('Automatische Übertragung aktivieren? Alle bereits abgeschlossenen und künftigen Partien werden anonymisiert an DameArena Community Learning übertragen. Bereits übertragene Partien lassen sich durch Ausschalten nicht vom Server löschen.')){$('autoSync').checked=false;return;}
+ syncSettings.enabled=enable;saveSyncSettings();syncStatus(enable?'Freigabe aktiv. Übertragung wird versucht.':'Automatische Übertragung deaktiviert.');if(enable)communitySync();
+};
+$('syncNow').onclick=()=>communitySync();
+window.addEventListener('online',()=>communitySync());
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)communitySync();});
+syncStatus(syncSettings.enabled?'Community Sync aktiviert.':'Community Sync deaktiviert.');
+setTimeout(communitySync,1500);
 $('mergeBackup').onclick=()=>$('mergeFile').click();
 $('mergeFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;
  try{

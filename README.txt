@@ -1,10 +1,15 @@
-DameArena Mobile 1.3 – Dateisicherung und Zusammenführen
+DameArena Mobile 1.5 – Community Sync (Netlify)
 
-Alle abgeschlossenen Partien stehen in EINER persönlichen JSON-Sicherung unter games; die laufende Partie unter current_game.
-Auf iOS öffnet „In Dateien sichern“ nach Möglichkeit das Teilen-Menü, dort „In Dateien sichern“ wählen. Alternativ Download in Safari und Datei manuell nach iCloud Drive oder Auf meinem iPhone verschieben.
-„Partien zusammenführen“ importiert abgeschlossene Partien derselben Spieler-UUID, überspringt vorhandene game_id und erhält laufende Partie sowie Profil.
-„Sicherung wiederherstellen (ersetzen)“ ersetzt weiterhin die gesamte lokale Datenbank – vorher exportieren!
-Community-Export ohne Anzeigenamen und persönliche Spieler-UUID; freiwillig und manuell.
-Die App kann auf iOS keine Hintergrunddatei automatisch überschreiben.
+DEPLOYMENT
+1. ZIP entpacken und alle Dateien/Ordner ins Root des GitHub-Repositories übernehmen.
+2. Netlify muss das Repository als Build-Deployment verwenden (nicht nur manuelles Drag-and-drop statischer Dateien).
+3. Build command: npm install; Publish directory: . ; Functions directory: netlify/functions (netlify.toml).
+4. Auf Netlify nach dem Deploy die Function community-ingest prüfen.
+5. Auf iPhones App neu laden, Version 1.5 kontrollieren.
+6. Checkbox Automatische Übertragung freiwillig aktivieren; nach abgeschlossenem Spiel Sync-Status kontrollieren.
 
-Deployment: Dateien aus dem ZIP im GitHub-Repository-Root ersetzen, committen.
+DATENSCHUTZ
+Keine automatische Übertragung ohne separate Opt-in-Bestätigung. Vorhandene und künftige abgeschlossene Partien werden nach Zustimmung übertragen. Spielername und persönliche Spieler-UUID werden serverseitig durch Whitelist ausgeschlossen. Partie-ID bleibt zur Duplikaterkennung erhalten. Ein Widerruf stoppt zukünftige Übertragungen, löscht bereits gespeicherte Daten nicht. Netlify verarbeitet notwendige technische Verbindungsdaten.
+
+BETRIEBSGRENZEN
+Dies ist ein erster Ingest-Prototyp, kein gehärteter öffentlicher Datendienst. Vor breiter Freigabe: Abuse-Schutz/Rate-Limit, Datenlöschprozess, Aufbewahrungsfrist, Datenschutzhinweise, Zugriffskontrolle und Monitoring ergänzen. Keine Behauptung, dass die Übertragung bereits live funktioniert, bevor Netlify erfolgreich deployed und getestet wurde. iOS-PWA synchronisiert nur bei geöffneter App/erneutem Online-Status; kein verlässlicher Hintergrund-Sync. Persönliche Sicherung bleibt erforderlich.
