@@ -48,8 +48,34 @@ $('saveProfile').onclick=()=>{const name=$('nameInput').value.trim();if(!name)re
 $('undo').onclick=()=>{const g=data.current;if(!g||!g.steps.length||busy||g.result)return;lastAiStep=null;const keep=g.steps.slice(0,-(g.state.side==='w'?2:1));const difficulty=g.difficulty;const original=clone(keep);g.state={board:fresh(),side:'w',chain:null};g.steps=[];g.positions={[poskey(g.state)]:1};g.quiet=0;for(const x of original){const from=[8-Number(x.from[1]),x.from.charCodeAt(0)-97],to=[8-Number(x.to[1]),x.to.charCodeAt(0)-97];const m=options(g.state.board,g.state.side,g.state.chain).find(m=>m.from[0]===from[0]&&m.from[1]===from[1]&&m.to[0]===to[0]&&m.to[1]===to[1]);if(m)record(m);}g.difficulty=difficulty;selected=null;save();render();};
 function downloadJSON(payload,prefix){const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=prefix+'_'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);}
 function communityGame(g){const c=clone(g);delete c.player_id;delete c.positions;delete c.state;delete c.quiet;c.white_player_id='community-human';c.black_player_id='damearena-mobile-ai';c.player_alias='anonymous';c.steps=(c.steps||[]).map((m,i)=>({ply:m.ply||i+1,actor_type:m.actor_type||(m.side==='w'?'HUMAN':'AI'),side:m.side,from:m.from,to:m.to,capture:m.capture,captured_square:m.captured_square||null}));return c;}
-$('export').onclick=()=>{downloadJSON({schema:'damearena-backup-v1',exported_at:new Date().toISOString(),profile:clone(data.profile),games:clone(data.games),current_game:data.current?clone(data.current):null},'DameArena_Backup');};
-$('communityExport').onclick=()=>{if(!$('consent').checked){alert('Bitte bestätige zuerst die freiwillige Freigabe.');return;}const games=data.games.map(communityGame);downloadJSON({schema:'damearena-community-v2',exported_at:new Date().toISOString(),privacy:'no-display-name-or-player-uuid',consent:true,source:'mobile-1.2',games},'DameArena_Community');};
+function personalBackup(){return {schema:'damearena-backup-v1',exported_at:new Date().toISOString(),profile:clone(data.profile),games:clone(data.games),current_game:data.current?clone(data.current):null};}
+async function saveToFiles(payload,prefix){
+ const name=prefix+'_'+new Date().toISOString().slice(0,10)+'.json';
+ const file=new File([JSON.stringify(payload,null,2)],name,{type:'application/json'});
+ // iOS share sheet can save directly into Files / iCloud Drive.
+ if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+  try{await navigator.share({files:[file],title:'DameArena JSON-Sicherung'});return;}
+  catch(e){if(e.name==='AbortError')return;}
+ }
+ downloadJSON(payload,prefix);
+ alert('JSON heruntergeladen. Falls kein Speicherort angeboten wurde: in Safari Downloads öffnen und die Datei über Teilen → In Dateien sichern ablegen.');
+}
+$('export').onclick=()=>saveToFiles(personalBackup(),'DameArena_Partien_'+(data.profile?.display_name||'Spieler').replace(/[^a-zA-Z0-9_-]/g,'_'));
+$('communityExport').onclick=()=>{if(!$('consent').checked){alert('Bitte bestätige zuerst die freiwillige Freigabe.');return;}const games=data.games.map(communityGame);saveToFiles({schema:'damearena-community-v2',exported_at:new Date().toISOString(),privacy:'no-display-name-or-player-uuid',consent:true,source:'mobile-1.3',games},'DameArena_Community');};
+$('mergeBackup').onclick=()=>$('mergeFile').click();
+$('mergeFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;
+ try{
+  if(f.size>15*1024*1024)throw Error('Datei zu groß (maximal 15 MB).');
+  const incoming=JSON.parse(await f.text());
+  if(incoming.schema!=='damearena-backup-v1'||!incoming.profile||!Array.isArray(incoming.games))throw Error('Bitte eine persönliche DameArena-Sicherung wählen.');
+  if(incoming.profile.player_id!==data.profile.player_id)throw Error('Andere Spieler-UUID. Für fremde Spielerprofile ist ein separater Community-Import vorgesehen.');
+  const known=new Set(data.games.map(g=>g.game_id));let added=0;
+  const merged=clone(data);
+  for(const g of incoming.games){if(!g||typeof g.game_id!=='string'||!Array.isArray(g.steps))throw Error('Ungültiger Partiedatensatz.');if(!known.has(g.game_id)){merged.games.push(g);known.add(g.game_id);added++;}}
+  if(!confirm(added+' neue Partien zusammenführen? Bestehende Partien und die laufende Partie bleiben erhalten.'))return;
+  localStorage.setItem(KEY,JSON.stringify(merged));data=merged;render();alert(added+' Partien importiert. '+(incoming.games.length-added)+' Duplikate übersprungen.');
+ }catch(err){alert('Zusammenführen fehlgeschlagen: '+err.message);}finally{e.target.value='';}
+};
 $('importBackup').onclick=()=>$('backupFile').click();
 $('backupFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{if(f.size>15*1024*1024)throw Error('Datei zu groß (maximal 15 MB).');const incoming=JSON.parse(await f.text());if(incoming.schema!=='damearena-backup-v1'&&incoming.schema!=='damearena-community-v1')throw Error('Unbekanntes Sicherungsformat.');if(!incoming.profile||typeof incoming.profile.player_id!=='string'||typeof incoming.profile.display_name!=='string'||!Array.isArray(incoming.games)||incoming.games.length>100000)throw Error('Ungültige Profildaten oder Partieliste.');if(!confirm('Sicherung importieren? Dein bisheriges Profil und deine Partien werden ersetzt. Bitte vorher eine eigene Sicherung exportieren.'))return;const restored={profile:incoming.profile,games:incoming.games,current:incoming.current_game||null};const serialized=JSON.stringify(restored);localStorage.setItem(KEY,serialized);data=restored;selected=null;lastAiStep=null;render();alert('Sicherung importiert. Bitte App neu öffnen, damit auch eine unterbrochene KI-Partie korrekt fortgesetzt wird.');}catch(err){alert('Import fehlgeschlagen: '+err.message);}finally{e.target.value='';}};
 if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
