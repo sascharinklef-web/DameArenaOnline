@@ -20,3 +20,6 @@ GRENZEN DES PROTOTYPS
 Keine Server-Synchronisierung, keine Community-Registrierung, kein Profil-Import, keine automatische Trainingsfunktion, keine validierte Gleichwertigkeit zur Windows-KI. Kein Anspruch auf vollständig getestete Spielregeln oder Remis-Äquivalenz. Der Zurück-Button ist eine einfache Testfunktion. Daten vor Safari-Datenlöschung exportieren. JSON-Export enthält personenbezugsfähige pseudonyme IDs und den Anzeigenamen; nicht ohne Prüfung veröffentlichen.
 
 Version 1.1: KI-Zuege werden mit Start- und Zielfeld hervorgehoben und in einzelnen Phasen sichtbar dargestellt. Bei Mehrfachschlaegen erfolgt die Darstellung Schritt fuer Schritt. Bestehende lokale Daten bleiben erhalten.
+
+
+Version 1.2: Spieler-/Partie-Identitäten bleiben erhalten. Vollständiger persönlicher JSON-Backup-Export und Import (ersetzt lokale Daten nach Bestätigung); separater pseudonymisierter Community-Export mit expliziter Freigabe, ausschließlich abgeschlossene Partien. Kein Upload und kein Server. Vor einem Import immer zuerst sichern. Mobile-KI und Regeln unverändert zu 1.1.
