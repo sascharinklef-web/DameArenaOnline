@@ -1,0 +1,16 @@
+DameArena Mobile 1.5.3 – Testversion
+
+Korrektur: Automatische Übertragung nur bei aktiver Einwilligung.
+Server: Netlify Blobs unterstützt nun optional manuell konfigurierte Zugangsdaten.
+
+WICHTIG: Der 503-Fehler wird durch den Code allein NICHT behoben.
+Das aktuelle Netlify-Deployment stellt die automatische Blobs-Umgebung nicht bereit.
+In Netlify unter Site configuration / Environment variables sind ggf.
+DAMEARENA_BLOBS_SITE_ID und DAMEARENA_BLOBS_TOKEN als geheime Umgebungsvariablen
+zu konfigurieren; danach neu deployen. Den Token NIEMALS in GitHub ablegen.
+Site-ID und Zugriffstoken müssen für Netlify Blobs geeignet sein.
+Ohne diese Werte bleibt der 503-Fehler bestehen.
+
+Dateien im GitHub-Repository unter gleichem Pfad ersetzen.
+Vorher persönliche JSON-Sicherung erstellen.
+Community Sync ist bis zum erfolgreichen Servertest NICHT produktiv freigegeben.

@@ -1,5 +1,5 @@
 'use strict';
-// DameArena Mobile 1.5.1. Rules ported from dame_engine.py 116.5.1.
+// DameArena Mobile 1.5.3. Rules ported from dame_engine.py 116.5.1.
 const KEY='damearena.mobile.v1', $=id=>document.getElementById(id), uid=()=>crypto.randomUUID();
 const clone=x=>JSON.parse(JSON.stringify(x));
 const fresh=()=>Array.from({length:8},(_,r)=>Array.from({length:8},(_,c)=>(r+c)%2?(r<3?'s':r>4?'w':'.'):'.'));
@@ -99,7 +99,7 @@ function saveSyncSettings(){try{localStorage.setItem(SYNC_KEY,JSON.stringify(syn
 function syncStatus(message){const el=$('syncStatus');if(el)el.textContent=message;}
 let syncRunning=false;
 async function communitySync(){
- if(!syncSettings.enabled||syncRunning||!navigator.onLine)return;
+ if(!syncSettings.enabled||!$('consent').checked||syncRunning||!navigator.onLine)return;
  syncRunning=true;
  try{
   const sent=new Set(syncSettings.sent);
@@ -107,7 +107,7 @@ async function communitySync(){
   if(!pending.length){syncStatus('Alle abgeschlossenen Partien synchronisiert.');return;}
   syncStatus(pending.length+' Partie(n) zur Übertragung vorgemerkt …');
   for(const g of pending){
-   if(!syncSettings.enabled)break;
+   if(!syncSettings.enabled||!$('consent').checked)break;
    const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),12000);
    let response;
    try{response=await fetch('/.netlify/functions/community-ingest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema:'damearena-community-v2',consent:true,game:communityGame(g)}),signal:controller.signal,cache:'no-store'});}finally{clearTimeout(timeout);}
@@ -119,17 +119,20 @@ async function communitySync(){
  }catch(err){syncStatus('Übertragung ausstehend ('+err.message+'). Erneuter Versuch bei nächstem App-Start/Online-Wechsel.');}
  finally{syncRunning=false;}
 }
-function scheduleCommunitySync(){if(syncSettings.enabled)setTimeout(communitySync,100);}
+function scheduleCommunitySync(){if(syncSettings.enabled&&$('consent').checked)setTimeout(communitySync,100);}
 $('autoSync').checked=syncSettings.enabled;
+$('consent').checked=syncSettings.enabled;
+$('consent').onchange=()=>{if(!$('consent').checked){syncSettings.enabled=false;$('autoSync').checked=false;saveSyncSettings();syncStatus('Einwilligung widerrufen. Keine weiteren Übertragungen.');}};
 $('autoSync').onchange=()=>{
  const enable=$('autoSync').checked;
+ if(enable&&!$('consent').checked){$('autoSync').checked=false;syncStatus('Bitte zuerst der freiwilligen Datenfreigabe zustimmen.');return;}
  if(enable&&!confirm('Automatische Übertragung aktivieren? Alle bereits abgeschlossenen und künftigen Partien werden anonymisiert an DameArena Community Learning übertragen. Bereits übertragene Partien lassen sich durch Ausschalten nicht vom Server löschen.')){$('autoSync').checked=false;return;}
  syncSettings.enabled=enable;saveSyncSettings();syncStatus(enable?'Freigabe aktiv. Übertragung wird versucht.':'Automatische Übertragung deaktiviert.');if(enable)communitySync();
 };
 $('syncNow').onclick=()=>communitySync();
 window.addEventListener('online',()=>communitySync());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)communitySync();});
-syncStatus(syncSettings.enabled?'Community Sync aktiviert.':'Community Sync deaktiviert.');
+syncStatus(syncSettings.enabled&&$('consent').checked?'Community Sync aktiviert.':'Community Sync deaktiviert.');
 setTimeout(communitySync,1500);
 $('mergeBackup').onclick=()=>$('mergeFile').click();
 $('mergeFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;
